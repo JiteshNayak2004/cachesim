@@ -132,14 +132,14 @@ bool IsCacheHit(cache_entry  *cache, string  address,int cache_lines) {
     if(cache[address_index].valid==1) {
 
 	if(cache[address_index].tag==address_tag) 
-	return 1;
-	else 
-	return 0;
+	    return 1;
+	    else 
+	    return 0;
     }
 
     else
     return 0;
-    
+
 
 }
 
@@ -177,9 +177,9 @@ void set_cache_tag(cache_entry *cache, string address,int cache_lines) {
 
     //setting the tag of the corresponding cache_line
     cache[address_index].tag=address_tag;
-    
+
     //setting the valid bit of the corresponding cach_line
-    
+
     cache[address_index].valid=1;
 
 
@@ -200,20 +200,20 @@ void CacheGet(cache_entry *cache,string address,int cache_lines) {
     int hit_status=IsCacheHit(cache,address,cache_lines);
     cout<<"the hit status is "<<hit_status<<endl;
     if(hit_status) {
-	
+
 	num_cache_hits=num_cache_hits+1;
 	num_load_hits=num_load_hits+1;
-	
+
 
     }
 
     else {
 	// as a miss need to access memory for a block
 	num_mem_accesses=num_mem_accesses+1;
-	
+
 	//need to write the tag of the fetch block on cache data not required as pointless
 	set_cache_tag(cache,address,cache_lines);
-	
+
     }
 
 
@@ -245,17 +245,21 @@ void CacheSet(cache_entry *cache,string address,int cache_lines) {
 
     num_stores=num_stores+1;
     int cache_index=Addr2CacheIndex( address,  cache_lines);
+    int hit_status=IsCacheHit(cache,address,cache_lines);
 
-    if(IsCacheHit(cache,  address,  cache_lines)&&cache[cache_index].dirty) {
+    if(hit_status&&cache[cache_index].dirty) {
 	num_cache_hits=num_cache_hits+1;
-	num_load_hits=num_load_hits+1;
+	num_store_hits=num_store_hits+1;
     }
     else {
 	// miss meaning need to go to lower level of memory which is memory here
 	num_mem_accesses=num_mem_accesses+1;
-	
+
 	// setting the tag for the fetched block
 	set_cache_tag(cache, address, cache_lines);
+	
+	//setting the dirty bit
+	cache[cache_index].dirty=1;
     }
 
 }
@@ -321,17 +325,13 @@ int main() {
     // Initialize cache with random values
     initialize_cache(cache, cache_index, cache_tag, cache_block_size);
 
-    //print_cache_contents(cache, cache_index, cache_tag, cache_block_size);
 
-    CacheGet(cache,"12341234",10);
-    //print_cache_contents(cache, cache_index, cache_tag, cache_block_size);
+    CacheSet(cache,"12341234",10);
+    CacheSet(cache,"12341234",10);
+    print_cache_contents(cache, cache_index, cache_tag, cache_block_size);
 
 
-    CacheGet(cache,"12341234",10);
-    
-    // CacheGet(cache,"3234a214",10);
-    // print_cache_contents(cache, cache_index, cache_tag, cache_block_size);
-    
+
     cache_result();
     return 0;
 
