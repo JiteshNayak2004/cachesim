@@ -11,6 +11,11 @@ thoughts:
 2.what we intend to do is say there's a miss that entry we make it such that
 we make note of misses and hits and update just the tag field data isn't 
 relevant
+
+
+tasks:
+1. manually make it 2 caches inefficient honestly find a better way
+
 */
 
 #include <bitset>
@@ -24,14 +29,25 @@ relevant
 #include <vector>
 
 
+// global metrics
+int num_loads=0;
+int num_stores=0;
+int num_cache_hits=0;
+int num_load_hits=0;
+int num_store_hits=0;
+int num_mem_accesses=0;
+
+
+
 using namespace std;
 
 // structure of a write back cache line
 struct cache_entry {
-	bool valid;
-	bool dirty;
-	vector<bool> tag;
-	vector<bool> data;
+
+    bool valid;
+    bool dirty;
+    vector<bool> tag;
+    vector<bool> data;
 };
 
 struct memory_entry {
@@ -39,24 +55,25 @@ struct memory_entry {
     int value;
 };
 
-// Function to initialize cache entries with random values
+// Function to initialize cache entries with 0s 
+
 void initialize_cache(cache_entry *cache, int cache_index, int cache_tag, int cache_block_size) {
     srand(time(0)); // Seed for random number generation
 
     for (int i = 0; i < cache_index; i++) {
-        // Initialize valid and dirty bits with random true/false
-        cache[i].valid=rand()%2;
-        cache[i].dirty=rand()%2;
+	// Initialize valid and dirty bits with random true/false
+	cache[i].valid=0;
+	cache[i].dirty=0;
 
-        // Initialize tag with random bits
-        for (int j = 0; j < cache_tag; j++) {
-            cache[i].tag[j] = rand() % 2;
-        }
+	// Initialize tag with 0s
+	for (int j = 0; j < cache_tag; j++) {
+	    cache[i].tag[j] = 0;
+	}
 
-        // Initialize data with random bits
-        for (int j = 0; j < cache_block_size * 8; j++) {
-            cache[i].data[j] = rand() % 2;
-        }
+	// Initialize data with random bits
+	for (int j = 0; j < cache_block_size * 8; j++) {
+	    cache[i].data[j] = 0;
+	}
     }
 }
 
@@ -66,22 +83,23 @@ void print_cache_contents(cache_entry *cache, int cache_index, int cache_tag, in
     cout << "---------------------------------------------------------------------\n";
 
     for (int i = 0; i < cache_index; i++) {
-        cout << i << "     | " << cache[i].valid << "     | " << cache[i].dirty << "     | ";
+	cout << i << "     | " << cache[i].valid << "     | " << cache[i].dirty << "     | ";
 
-        // Print tag
-        for (int j = 0; j < cache_tag; j++) {
-            cout << cache[i].tag[j];
-        }
-        cout << " | ";
+	// Print tag
+	for (int j = 0; j < cache_tag; j++) {
+	    cout << cache[i].tag[j];
+	}
+	cout << " | ";
 
-        // Print data
-        for (int j = 0; j < cache_block_size * 8; j++) {
-            cout << cache[i].data[j];
-        }
-        cout << "\n";
+	// Print data
+	for (int j = 0; j < cache_block_size * 8; j++) {
+	    cout << cache[i].data[j];
+	}
+	cout << "\n";
     }
 }
 
+// cache entry lookup operation
 bool IsCacheHit(cache_entry  *cache, string  address,int cache_lines) {
 
 
@@ -96,12 +114,11 @@ bool IsCacheHit(cache_entry  *cache, string  address,int cache_lines) {
     //finding index the mem_address corresponds to in the cache
     int address_index=decimal_address%cache_lines;
 
-    cout<<"the address maps to this index in cache "<<(address_index)<<endl; 
-    cout<<"the decimal equivalent of addr is "<<decimal_address<<endl;
+    cout<<"the address maps to index "<<(address_index)<<" in cache"<<endl; 
 
     // address in 0s and 1s
     std::bitset<32> binary_address(decimal_address);
-   
+
 
     // extracting the tag bits from msb to lsb from address
     vector<bool> address_tag;
@@ -110,9 +127,9 @@ bool IsCacheHit(cache_entry  *cache, string  address,int cache_lines) {
 	address_tag.push_back(binary_address[i]);
     }
 
-    // checking valid and tag fields
+    // checking valid and tag fields 
     if(cache[address_index].valid==1) {
-	
+
 	if(cache[address_index].tag==address_tag) {
 
 	    return 1;
@@ -130,86 +147,175 @@ bool IsCacheHit(cache_entry  *cache, string  address,int cache_lines) {
 
 }
 
+// a function that takes in address and extracts the tag and changes it along with the valid bit
+
+void set_cache_tag(cache_entry *cache, string address,int cache_lines) {
+
+
+    //delete later
+    cout<<"now modifying the tag"<<endl;
+
+    bitset<32> bit_address;
+    int decimal_address;
+
+    // no of bits to encode no of cache lines
+    int bits_cache_lines=ceil(log2(cache_lines));
+    //converting the hex addr in trace to bits
+    decimal_address=stoi(address, nullptr, 16);
+
+    //finding index the mem_address corresponds to in the cache
+    int address_index=decimal_address%cache_lines;
+
+
+    // address in 0s and 1s
+    std::bitset<32> binary_address(decimal_address);
+
+    // extracting the tag bits from msb to lsb from address
+    vector<bool> address_tag;
+
+    for(int i=31;i>bits_cache_lines;i--) {
+
+	address_tag.push_back(binary_address[i]);
+
+    }
+
+    //setting the tag of the corresponding cache_line
+    cache[address_index].tag=address_tag;
+    
+    //setting the valid bit of the corresponding cach_line
+    
+    cache[address_index].valid=1;
+
+
+
+
+}
+
+
+
+// cache get for load operations
+void CacheGet(cache_entry *cache,string address,int cache_lines) {
+
+    num_loads=num_loads+1;
+
+    //delete later
+    cout<<"loading address from "<<address<<endl;
+
+    if(IsCacheHit(cache,address,cache_lines)) {
+
+	num_cache_hits=num_cache_hits+1;
+	num_load_hits=num_load_hits+1;
+	
+
+    }
+
+    else {
+	// as a miss need to access memory for a block
+	num_mem_accesses=num_mem_accesses+1;
+	
+	//need to write the tag of the fetch block on cache data not required as pointless
+	set_cache_tag(cache,address,cache_lines);
+	
+    }
+
+
+}
+
+// a function that takes an address and returns the corresponding cache index it maps to
+int Addr2CacheIndex(string address,int cache_lines) {
+
+
+    int decimal_address;
+    //converting the hex addr in trace to bits
+    decimal_address=stoi(address, nullptr, 16);
+
+    //finding index the mem_address corresponds to in the cache
+    int address_index=decimal_address%cache_lines;
+
+    return address_index;
+
+
+
+}
+
+
+
+
+// cache set for store operations
+void CacheSet(cache_entry *cache,string address,int cache_lines) {
+
+
+    num_stores=num_stores+1;
+    int cache_index=Addr2CacheIndex( address,  cache_lines);
+
+    if(IsCacheHit(cache,  address,  cache_lines)&&cache[cache_index].dirty) {
+	num_cache_hits=num_cache_hits+1;
+	num_load_hits=num_load_hits+1;
+    }
+    else {
+	// miss meaning need to go to lower level of memory which is memory here
+	num_mem_accesses=num_mem_accesses+1;
+	
+	// setting the tag for the fetched block
+	set_cache_tag(cache, address, cache_lines);
+    }
+
+}
+
 int main() {
 
-	
-	//initialization variables
-	int cache_blocks=1024;
-	int cache_block_size=4;
-	int associativity=1;
-	
-	// cout<<"welcome to cache sim";
-	//
-	//
-	//
-	// cout<<"enter no of blocks in cache ";
-	// cin>>cache_blocks;
-	// 
-	// cout<<"enter block size in bytes";
-	// cin>>cache_block_size;
-	//
-	//
-	// cout<<"enter associativity";
-	// cin>>associativity;
-	
-	
-	//finding no of words in a block and then taking log2
-	int cache_index=log2(cache_blocks);
-	
-	//finding no of words in a block and then taking log2
-	int word_offset=log2(cache_block_size/4);
 
-	// every word is 4 bytes thus 2 bits 
-	int byte_offset=2;
-	int cache_tag=(32-(cache_index+word_offset+byte_offset));
+    //initialization variables
+    int cache_blocks=1024;
+    int cache_block_size=4;
+    int associativity=1;
 
 
-	cout<<"no of cache blocks are "<<cache_blocks<<endl;
-	cout<<"cache block size is "<<cache_block_size<< "bytes"<<endl;
-	cout<<"the tag is "<<cache_tag<<" bits long"<<endl;
-	cout<<"the index is "<<cache_index<<" bits long"<<endl;
 
-	
-	// resizing the struct's data and tag elements
-	
-	struct cache_entry cache[cache_index];
+    //finding no of words in a block and then taking log2
+    int cache_index=log2(cache_blocks);
 
-	for(int i=0;i<cache_index;i++) {
+    //finding no of words in a block and then taking log2
+    int word_offset=log2(cache_block_size/4);
 
-		cache[i].data.resize(cache_block_size*8);
-		cache[i].tag.resize(cache_tag);
-
-	}
-	
-	//printing the modified sizes
-	
-	// for(int i=0;i<cache_index;i++) {
-	// 
-	//
-	// 	cout<<"the size of tag is "<<size(cache[i].tag)<<endl;
-	// 	cout<<"the size of data in cache is "<<size(cache[i].data)<<endl;
-	//
-	// }
-	//
-
-	// Initialize cache with random values
-	initialize_cache(cache, cache_index, cache_tag, cache_block_size);
-
-	// Print the modified sizes and contents
-	print_cache_contents(cache, cache_index, cache_tag, cache_block_size);
-
-
-	
-	IsCacheHit(cache,"f" ,10);
+    // every word is 4 bytes thus 2 bits 
+    int byte_offset=2;
+    int cache_tag=(32-(cache_index+word_offset+byte_offset));
 
 
 
 
+    cout << "--------------------------" << endl;
+    cout << "| Number of cache blocks | " << cache_blocks << endl;
+    cout << "| Cache block size       | " << cache_block_size << endl;
+    cout << "| Tag size               | " << cache_tag << endl;
+    cout << "| Index size             | " << cache_index << endl;
+    cout << "--------------------------" << endl;
 
 
+    // resizing the struct's data and tag elements
+
+    struct cache_entry cache[cache_index];
+
+    for(int i=0;i<cache_index;i++) {
+
+	cache[i].data.resize(cache_block_size*8);
+	cache[i].tag.resize(cache_tag);
+
+    }
 
 
-	return 0;
+    // Initialize cache with random values
+    initialize_cache(cache, cache_index, cache_tag, cache_block_size);
+
+    print_cache_contents(cache, cache_index, cache_tag, cache_block_size);
+
+    CacheGet(cache,"12341234",10);
+    print_cache_contents(cache, cache_index, cache_tag, cache_block_size);
+
+    CacheGet(cache,"3234a214",10);
+    print_cache_contents(cache, cache_index, cache_tag, cache_block_size);
+    return 0;
 
 
 
