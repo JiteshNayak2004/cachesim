@@ -99,7 +99,7 @@ void print_cache_contents(cache_entry *cache, int cache_index, int cache_tag, in
     }
 }
 
-// cache entry lookup operation
+// cache entry lookup operation 1 indicates hit and 0 is not a hit
 bool IsCacheHit(cache_entry  *cache, string  address,int cache_lines) {
 
 
@@ -114,7 +114,6 @@ bool IsCacheHit(cache_entry  *cache, string  address,int cache_lines) {
     //finding index the mem_address corresponds to in the cache
     int address_index=decimal_address%cache_lines;
 
-    cout<<"the address maps to index "<<(address_index)<<" in cache"<<endl; 
 
     // address in 0s and 1s
     std::bitset<32> binary_address(decimal_address);
@@ -122,7 +121,9 @@ bool IsCacheHit(cache_entry  *cache, string  address,int cache_lines) {
 
     // extracting the tag bits from msb to lsb from address
     vector<bool> address_tag;
-    for(int i=31;i<bits_cache_lines;i--) {
+
+    // i>bits_cache_lines is critical
+    for(int i=31;i>bits_cache_lines;i--) {
 
 	address_tag.push_back(binary_address[i]);
     }
@@ -130,20 +131,15 @@ bool IsCacheHit(cache_entry  *cache, string  address,int cache_lines) {
     // checking valid and tag fields 
     if(cache[address_index].valid==1) {
 
-	if(cache[address_index].tag==address_tag) {
-
-	    return 1;
-	}
-
-	else {
-	    return 0;
-	}
-
-    }
-
-    else{
+	if(cache[address_index].tag==address_tag) 
+	return 1;
+	else 
 	return 0;
     }
+
+    else
+    return 0;
+    
 
 }
 
@@ -201,8 +197,10 @@ void CacheGet(cache_entry *cache,string address,int cache_lines) {
     //delete later
     cout<<"loading address from "<<address<<endl;
 
-    if(IsCacheHit(cache,address,cache_lines)) {
-
+    int hit_status=IsCacheHit(cache,address,cache_lines);
+    cout<<"the hit status is "<<hit_status<<endl;
+    if(hit_status) {
+	
 	num_cache_hits=num_cache_hits+1;
 	num_load_hits=num_load_hits+1;
 	
@@ -262,6 +260,21 @@ void CacheSet(cache_entry *cache,string address,int cache_lines) {
 
 }
 
+// a function that show's cache hit/miss statistics
+
+void cache_result() {
+
+    cout<<"num_loads are "<<num_loads<<endl;
+    cout<<"num_stores are "<<num_stores<<endl;
+    cout<<"num_cache_hits are "<<num_cache_hits<<endl;
+    cout<<"num_load_hits are "<<num_load_hits<<endl;
+    cout<<"num_store_hits are "<<num_store_hits<<endl;
+    cout<<"num_mem_accesses are "<<num_mem_accesses<<endl;
+
+
+}
+
+
 int main() {
 
 
@@ -308,13 +321,18 @@ int main() {
     // Initialize cache with random values
     initialize_cache(cache, cache_index, cache_tag, cache_block_size);
 
-    print_cache_contents(cache, cache_index, cache_tag, cache_block_size);
+    //print_cache_contents(cache, cache_index, cache_tag, cache_block_size);
 
     CacheGet(cache,"12341234",10);
-    print_cache_contents(cache, cache_index, cache_tag, cache_block_size);
+    //print_cache_contents(cache, cache_index, cache_tag, cache_block_size);
 
-    CacheGet(cache,"3234a214",10);
-    print_cache_contents(cache, cache_index, cache_tag, cache_block_size);
+
+    CacheGet(cache,"12341234",10);
+    
+    // CacheGet(cache,"3234a214",10);
+    // print_cache_contents(cache, cache_index, cache_tag, cache_block_size);
+    
+    cache_result();
     return 0;
 
 
