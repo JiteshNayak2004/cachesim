@@ -177,7 +177,7 @@ bool IsWayHit(cache_entry  *way, string  address,int cache_lines) {
 
 	if(way[address_index].tag==address_tag) 
 	    return 1;
-	else 
+	    else 
 	    return 0;
     }
 
@@ -213,101 +213,68 @@ void set_way_tag(cache_entry *cache, string address,int cache_lines) {
 
 void CacheGet(set_associative *cache,string address,int associativity,int total_cache_lines) {
 
-	int num_loads=num_loads+1;
-	int hit_flag;
-	int way_hit;
-    
-	//set index the address maps to also total_cache_lines=total no of sets
-	int AddrSetIndex=Addr2CacheIndex( total_cache_lines, address);
-	
+    int num_loads=num_loads+1;
+    int hit_flag;
+    int way_hit;
+
+    //set index the address maps to also total_cache_lines=total no of sets
+    int AddrSetIndex=Addr2CacheIndex( total_cache_lines, address);
 
 
-	// finding hit or no and which way
-	for(int i=0;i<associativity;i++) {
-	
-		//we search all the ways of the set the address maps to
-		if(IsWayHit(&(cache[AddrSetIndex].ways[i]),address,total_cache_lines)){
-			hit_flag=1;
-			way_hit=i;
-		}
+
+    // finding hit or no and which way
+    for(int i=0;i<associativity;i++) {
+
+	//we search all the ways of the set the address maps to
+	if(IsWayHit(&(cache[AddrSetIndex].ways[i]),address,total_cache_lines)){
+	    hit_flag=1;
+	    way_hit=i;
 	}
+    }
 
-	if(hit_flag) {
+    if(hit_flag) {
 
-		int num_cache_hits=num_cache_hits+1;
-		int num_load_hits=num_load_hits+1;
-	}
-
-	else {
-		int num_mem_accesses=num_mem_accesses+1;
-		
-		// have to check all the ways are they filled
-		// if not place block(write tag) in that way
-		// if full evict LRU block and write in that
-		// way
-
-		for(int i=0;i<associativity;i++) {
-
-			if(cache[AddrSetIndex].ways[i].valid==0) {
-			
-				//make the way valid and place block
-				cache[AddrSetIndex].ways[i].valid=1;
-				set_way_tag(&(cache[AddrSetIndex].ways[i]), address, total_cache_lines);
-				
-				//storing block index in LRU queue
-				cache->LRU.push_front(i);
-				break;
-			}
-
-			else {
-				// evict LRU block
-				int LRU_way=cache->LRU.back();
-				cache->LRU.pop_back();
-
-				// and then set the tag for that way
-			}
-
-		
-
-		}
-
-	}
-
-
-
-
-}
-
-
-
-
-// checks whether block exists in a way of the set associative cache
-// needs one rewrite honestly
-void CacheGet(cache_entry *cache,string address,int cache_lines) {
-
-    num_loads=num_loads+1;
-
-    int hit_status=IsWayHit(cache,address,cache_lines);
-
-    if(hit_status) {
-
-	num_cache_hits=num_cache_hits+1;
-	num_load_hits=num_load_hits+1;
-
-
+	int num_cache_hits=num_cache_hits+1;
+	int num_load_hits=num_load_hits+1;
     }
 
     else {
-	// as a miss need to access memory for a block
-	num_mem_accesses=num_mem_accesses+1;
+	int num_mem_accesses=num_mem_accesses+1;
 
-	//need to write the tag of the fetch block on cache data not required as pointless
-	set_way_tag(cache,address,cache_lines);
+	// have to check all the ways are they filled
+	// if not place block(write tag) in that way
+	// if full evict LRU block and write in that
+	// way
+
+	for(int i=0;i<associativity;i++) {
+
+	    if(cache[AddrSetIndex].ways[i].valid==0) {
+
+		//make the way valid and place block
+		cache[AddrSetIndex].ways[i].valid=1;
+		set_way_tag(&(cache[AddrSetIndex].ways[i]), address, total_cache_lines);
+
+		//storing block index in LRU queue
+		cache->LRU.push_front(i);
+		break;
+	    }
+
+	    else {
+		// evict LRU block
+	    int LRU_way=cache->LRU.back();
+		cache->LRU.pop_back();
+
+		// and then set the tag for that way
+	    }
+
+
+
+	}
 
     }
 
-
 }
+
 
 
 
@@ -329,7 +296,7 @@ void CacheSet(cache_entry *cache,string address,int cache_lines) {
 
 	// setting the tag for the fetched block
 	set_way_tag(cache, address, cache_lines);
-	
+
 	//setting the dirty bit
 	cache[cache_index].dirty=1;
     }
@@ -372,14 +339,14 @@ int main() {
 
 
     // all set associative essential value finding
-    
+
     int set_index=log2(cache_blocks/associativity);
     int set_tag=(32-(set_index+word_offset+byte_offset));
 
     // creating the set associative structure
-    
+
     struct set_associative associative_cache[set_index];
-    
+
     //resizing the ways according to associativity
     for(int i=0;i<set_index;i++) {
 
