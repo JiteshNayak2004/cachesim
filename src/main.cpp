@@ -14,12 +14,17 @@ relevant
 
 
 tasks:
-1. make the set associative structure and get rough plan
+1. convert direct map as a special case of set associative
+have a function to decide no of ways
+2. have a function for cache eviction
+3. make IsWayHit support associativity
 */
 
 #include <bitset>
 #include <cstdlib>
+#include <deque>
 #include <ostream>
+#include <queue>
 #include <string>
 #include <vector>
 #include <cmath>
@@ -60,8 +65,8 @@ struct cache_entry {
 struct set_associative {
 
 
-    //hold's the index of the LRU block in a set
-    int LRU;
+    //hold's the queue of block's indices for LRU eviction
+    deque<int> LRU;
     // as every way of a set is like a cache entry only
     vector<cache_entry> ways;
 
@@ -112,9 +117,8 @@ void print_cache_contents(cache_entry *cache, int cache_index, int cache_tag, in
     }
 }
 
-// cache entry lookup operation:1 indicates hit and 0 is not a hit
-bool IsCacheHit(cache_entry  *cache, string  address,int cache_lines) {
-
+// extracts tag from address 
+vector<bool> Addr2CacheTag(int cache_lines,string address) {
 
     bitset<32> bit_address;
     int decimal_address;
@@ -127,26 +131,53 @@ bool IsCacheHit(cache_entry  *cache, string  address,int cache_lines) {
     //finding index the mem_address corresponds to in the cache
     int address_index=decimal_address%cache_lines;
 
-
     // address in 0s and 1s
     std::bitset<32> binary_address(decimal_address);
-
 
     // extracting the tag bits from msb to lsb from address
     vector<bool> address_tag;
 
     // i>bits_cache_lines is critical
     for(int i=31;i>bits_cache_lines;i--) {
-
 	address_tag.push_back(binary_address[i]);
     }
 
-    // checking valid and tag fields 
-    if(cache[address_index].valid==1) {
+    return address_tag;
+}
 
-	if(cache[address_index].tag==address_tag) 
+// extracts index from address
+int Addr2CacheIndex(int cache_lines,string address) {
+
+    // bits to encode no of cache lines
+    int bits_cache_lines=ceil(log2(cache_lines));
+    //converting the hex addr in trace to bits
+    int decimal_address=stoi(address, nullptr, 16);
+
+    //finding index the mem_address corresponds to in the cache
+    int address_index=decimal_address%cache_lines;
+
+    return address_index;
+
+
+}
+
+
+// cache entry lookup operation:1 indicates hit and 0 is not a hit
+bool IsWayHit(cache_entry  *way, string  address,int cache_lines) {
+
+
+    vector<bool> address_tag;
+    address_tag=Addr2CacheTag(cache_lines,address);
+
+    int address_index;
+    address_index=Addr2CacheIndex(cache_lines,address);
+
+    // checking valid and tag fields 
+    if(way[address_index].valid==1) {
+
+	if(way[address_index].tag==address_tag) 
 	    return 1;
-	    else 
+	else 
 	    return 0;
     }
 
@@ -156,35 +187,17 @@ bool IsCacheHit(cache_entry  *cache, string  address,int cache_lines) {
 
 }
 
-// a function that takes in address and extracts the tag and changes it along with the valid bit
+//a function that takes in address and extracts the tag 
+//and changes it along with the valid bit
 
-void set_cache_tag(cache_entry *cache, string address,int cache_lines) {
-
-
-
-    bitset<32> bit_address;
-    int decimal_address;
-
-    // no of bits to encode no of cache lines
-    int bits_cache_lines=ceil(log2(cache_lines));
-    //converting the hex addr in trace to bits
-    decimal_address=stoi(address, nullptr, 16);
-
-    //finding index the mem_address corresponds to in the cache
-    int address_index=decimal_address%cache_lines;
+void set_way_tag(cache_entry *cache, string address,int cache_lines) {
 
 
-    // address in 0s and 1s
-    std::bitset<32> binary_address(decimal_address);
+    int address_index;
+    address_index=Addr2CacheIndex(cache_lines,address);
 
-    // extracting the tag bits from msb to lsb from address
     vector<bool> address_tag;
-
-    for(int i=31;i>bits_cache_lines;i--) {
-
-	address_tag.push_back(binary_address[i]);
-
-    }
+    address_tag=Addr2CacheTag(cache_lines,address);
 
     //setting the tag of the corresponding cache_line
     cache[address_index].tag=address_tag;
@@ -192,6 +205,73 @@ void set_cache_tag(cache_entry *cache, string address,int cache_lines) {
     //setting the valid bit of the corresponding cach_line
 
     cache[address_index].valid=1;
+}
+
+
+
+// set associative version of CacheGet
+
+void CacheGet(set_associative *cache,string address,int associativity,int total_cache_lines) {
+
+	int num_loads=num_loads+1;
+	int hit_flag;
+	int way_hit;
+    
+	//set index the address maps to also total_cache_lines=total no of sets
+	int AddrSetIndex=Addr2CacheIndex( total_cache_lines, address);
+	
+
+
+	// finding hit or no and which way
+	for(int i=0;i<associativity;i++) {
+	
+		//we search all the ways of the set the address maps to
+		if(IsWayHit(&(cache[AddrSetIndex].ways[i]),address,total_cache_lines)){
+			hit_flag=1;
+			way_hit=i;
+		}
+	}
+
+	if(hit_flag) {
+
+		int num_cache_hits=num_cache_hits+1;
+		int num_load_hits=num_load_hits+1;
+	}
+
+	else {
+		int num_mem_accesses=num_mem_accesses+1;
+		
+		// have to check all the ways are they filled
+		// if not place block(write tag) in that way
+		// if full evict LRU block and write in that
+		// way
+
+		for(int i=0;i<associativity;i++) {
+
+			if(cache[AddrSetIndex].ways[i].valid==0) {
+			
+				//make the way valid and place block
+				cache[AddrSetIndex].ways[i].valid=1;
+				set_way_tag(&(cache[AddrSetIndex].ways[i]), address, total_cache_lines);
+				
+				//storing block index in LRU queue
+				cache->LRU.push_front(i);
+				break;
+			}
+
+			else {
+				// evict LRU block
+				int LRU_way=cache->LRU.back();
+				cache->LRU.pop_back();
+
+				// and then set the tag for that way
+			}
+
+		
+
+		}
+
+	}
 
 
 
@@ -200,16 +280,15 @@ void set_cache_tag(cache_entry *cache, string address,int cache_lines) {
 
 
 
-// cache get for load operations
+
+// checks whether block exists in a way of the set associative cache
+// needs one rewrite honestly
 void CacheGet(cache_entry *cache,string address,int cache_lines) {
 
     num_loads=num_loads+1;
 
-    //delete later
-    cout<<"loading address from "<<address<<endl;
+    int hit_status=IsWayHit(cache,address,cache_lines);
 
-    int hit_status=IsCacheHit(cache,address,cache_lines);
-    cout<<"the hit status is "<<hit_status<<endl;
     if(hit_status) {
 
 	num_cache_hits=num_cache_hits+1;
@@ -223,30 +302,12 @@ void CacheGet(cache_entry *cache,string address,int cache_lines) {
 	num_mem_accesses=num_mem_accesses+1;
 
 	//need to write the tag of the fetch block on cache data not required as pointless
-	set_cache_tag(cache,address,cache_lines);
+	set_way_tag(cache,address,cache_lines);
 
     }
 
 
 }
-
-// a function that takes an address and returns the corresponding cache index it maps to
-int Addr2CacheIndex(string address,int cache_lines) {
-
-
-    int decimal_address;
-    //converting the hex addr in trace to bits
-    decimal_address=stoi(address, nullptr, 16);
-
-    //finding index the mem_address corresponds to in the cache
-    int address_index=decimal_address%cache_lines;
-
-    return address_index;
-
-
-
-}
-
 
 
 
@@ -255,8 +316,8 @@ void CacheSet(cache_entry *cache,string address,int cache_lines) {
 
 
     num_stores=num_stores+1;
-    int cache_index=Addr2CacheIndex( address,  cache_lines);
-    int hit_status=IsCacheHit(cache,address,cache_lines);
+    int cache_index=Addr2CacheIndex(cache_lines,address);
+    int hit_status=IsWayHit(cache,address,cache_lines);
 
     if(hit_status&&cache[cache_index].dirty) {
 	num_cache_hits=num_cache_hits+1;
@@ -267,7 +328,7 @@ void CacheSet(cache_entry *cache,string address,int cache_lines) {
 	num_mem_accesses=num_mem_accesses+1;
 
 	// setting the tag for the fetched block
-	set_cache_tag(cache, address, cache_lines);
+	set_way_tag(cache, address, cache_lines);
 	
 	//setting the dirty bit
 	cache[cache_index].dirty=1;
@@ -307,6 +368,8 @@ int main() {
     int cache_tag=(32-(cache_index+word_offset+byte_offset));
 
 
+    int associativity=3;
+
 
     // all set associative essential value finding
     
@@ -316,6 +379,12 @@ int main() {
     // creating the set associative structure
     
     struct set_associative associative_cache[set_index];
+    
+    //resizing the ways according to associativity
+    for(int i=0;i<set_index;i++) {
+
+	associative_cache[i].ways.resize(associativity);
+    }
 
 
     cout << "--------------------------" << endl;
