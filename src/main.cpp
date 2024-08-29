@@ -14,8 +14,7 @@ relevant
 
 
 tasks:
-1. manually make it 2 caches inefficient honestly find a better way
-
+1. make the set associative structure and get rough plan
 */
 
 #include <bitset>
@@ -38,6 +37,12 @@ int num_store_hits=0;
 int num_mem_accesses=0;
 
 
+//initialization variables
+int cache_blocks=1024;
+int cache_block_size=4;
+int associativity=1;
+
+
 
 using namespace std;
 
@@ -50,15 +55,23 @@ struct cache_entry {
     vector<bool> data;
 };
 
-struct memory_entry {
-    bitset<32> address;
-    int value;
+
+// structure of a set associative cache
+struct set_associative {
+
+
+    //hold's the index of the LRU block in a set
+    int LRU;
+    // as every way of a set is like a cache entry only
+    vector<cache_entry> ways;
+
+
+
 };
 
 // Function to initialize cache entries with 0s 
 
 void initialize_cache(cache_entry *cache, int cache_index, int cache_tag, int cache_block_size) {
-    srand(time(0)); // Seed for random number generation
 
     for (int i = 0; i < cache_index; i++) {
 	// Initialize valid and dirty bits with random true/false
@@ -99,7 +112,7 @@ void print_cache_contents(cache_entry *cache, int cache_index, int cache_tag, in
     }
 }
 
-// cache entry lookup operation 1 indicates hit and 0 is not a hit
+// cache entry lookup operation:1 indicates hit and 0 is not a hit
 bool IsCacheHit(cache_entry  *cache, string  address,int cache_lines) {
 
 
@@ -148,8 +161,6 @@ bool IsCacheHit(cache_entry  *cache, string  address,int cache_lines) {
 void set_cache_tag(cache_entry *cache, string address,int cache_lines) {
 
 
-    //delete later
-    cout<<"now modifying the tag"<<endl;
 
     bitset<32> bit_address;
     int decimal_address;
@@ -282,12 +293,8 @@ void cache_result() {
 int main() {
 
 
-    //initialization variables
-    int cache_blocks=1024;
-    int cache_block_size=4;
-    int associativity=1;
 
-
+    // all direct mapping essential value finding 
 
     //finding no of words in a block and then taking log2
     int cache_index=log2(cache_blocks);
@@ -301,6 +308,15 @@ int main() {
 
 
 
+    // all set associative essential value finding
+    
+    int set_index=log2(cache_blocks/associativity);
+    int set_tag=(32-(set_index+word_offset+byte_offset));
+
+    // creating the set associative structure
+    
+    struct set_associative associative_cache[set_index];
+
 
     cout << "--------------------------" << endl;
     cout << "| Number of cache blocks | " << cache_blocks << endl;
@@ -310,7 +326,7 @@ int main() {
     cout << "--------------------------" << endl;
 
 
-    // resizing the struct's data and tag elements
+    // creating the cache structure convert into a function later
 
     struct cache_entry cache[cache_index];
 
