@@ -40,10 +40,11 @@ int num_cache_hits=0;
 int num_load_hits=0;
 int num_store_hits=0;
 int num_mem_accesses=0;
-
+int mem_writes=0;
 
 //initialization variables
 int cache_blocks=1024;
+// block size is in bytes
 int cache_block_size=4;
 int associativity=1;
 
@@ -68,6 +69,7 @@ struct set_associative {
     //hold's the queue of block's indices for LRU eviction
     deque<int> LRU;
     // as every way of a set is like a cache entry only
+    // no of ways=associativity
     vector<cache_entry> ways;
 
 
@@ -94,6 +96,36 @@ void initialize_cache(cache_entry *cache, int cache_index, int cache_tag, int ca
 	}
     }
 }
+
+void display_cache(const set_associative* cache, int num_sets, int associativity, int cache_tag_size, int cache_block_size) {
+    std::cout << "Set | Way | Valid | Dirty | Tag                             | Data\n";
+    std::cout << "---------------------------------------------------------------------\n";
+
+    for (int i = 0; i < num_sets; i++) {
+        for (int j = 0; j < associativity; j++) {
+            std::cout << i << "   | " << j << "   | " 
+                      << cache[i].ways[j].valid << "     | " 
+                      << cache[i].ways[j].dirty << "     | ";
+
+            // Print tag
+            for (int k = 0; k < cache_tag_size; k++) {
+                std::cout << cache[i].ways[j].tag[k];
+            }
+            std::cout << " | ";
+
+            // Print data
+            for (int k = 0; k < cache_block_size * 8; k++) {
+                std::cout << cache[i].ways[j].data[k];
+            }
+            std::cout << "\n";
+        }
+    }
+}
+
+
+
+
+
 
 // Function to display the cache contents in a nicely formatted way
 void print_cache_contents(cache_entry *cache, int cache_index, int cache_tag, int cache_block_size) {
@@ -163,7 +195,7 @@ int Addr2CacheIndex(int cache_lines,string address) {
 
 
 // cache entry lookup operation:1 indicates hit and 0 is not a hit
-bool IsWayHit(cache_entry  *way, string  address,int cache_lines) {
+bool IsWayHit(cache_entry *way, string  address,int cache_lines) {
 
 
     vector<bool> address_tag;
@@ -177,7 +209,7 @@ bool IsWayHit(cache_entry  *way, string  address,int cache_lines) {
 
 	if(way[address_index].tag==address_tag) 
 	    return 1;
-	    else 
+	else 
 	    return 0;
     }
 
@@ -208,17 +240,31 @@ void set_way_tag(cache_entry *cache, string address,int cache_lines) {
 }
 
 
+// initializing cache
+void initialize_cache(set_associative* cache_entry, int num_sets, int associativity) {
+    for (int i = 0; i < num_sets; i++) {
+        for (int j = 0; j < associativity; j++) {
+            cache_entry[i].ways[j].valid = false;
+            cache_entry[i].ways[j].dirty = false;
+            cache_entry[i].ways[j].tag.clear();
+            cache_entry[i].ways[j].data.clear();
+        }
+        cache_entry[i].LRU.clear();
+    }
+}
+
+
 
 // set associative version of CacheGet
 
-void CacheGet(set_associative *cache,string address,int associativity,int total_cache_lines) {
+void CacheGet(set_associative *cache_entry,string address,int associativity,int num_sets) {
 
     int num_loads=num_loads+1;
     int hit_flag;
     int way_hit;
 
-    //set index the address maps to also total_cache_lines=total no of sets
-    int AddrSetIndex=Addr2CacheIndex( total_cache_lines, address);
+    //holds the set index the address maps to
+    int AddrSetIndex=Addr2CacheIndex( num_sets, address);
 
 
 
@@ -226,7 +272,7 @@ void CacheGet(set_associative *cache,string address,int associativity,int total_
     for(int i=0;i<associativity;i++) {
 
 	//we search all the ways of the set the address maps to
-	if(IsWayHit(&(cache[AddrSetIndex].ways[i]),address,total_cache_lines)){
+	if(IsWayHit(&(cache_entry[AddrSetIndex].ways[i]),address,num_sets)){
 	    hit_flag=1;
 	    way_hit=i;
 	}
@@ -248,23 +294,24 @@ void CacheGet(set_associative *cache,string address,int associativity,int total_
 
 	for(int i=0;i<associativity;i++) {
 
-	    if(cache[AddrSetIndex].ways[i].valid==0) {
+	    if(cache_entry[AddrSetIndex].ways[i].valid==0) {
 
 		//make the way valid and place block
-		cache[AddrSetIndex].ways[i].valid=1;
-		set_way_tag(&(cache[AddrSetIndex].ways[i]), address, total_cache_lines);
+		cache_entry[AddrSetIndex].ways[i].valid=1;
+		set_way_tag(&(cache_entry[AddrSetIndex].ways[i]), address, num_sets);
 
 		//storing block index in LRU queue
-		cache->LRU.push_front(i);
+		cache_entry->LRU.push_front(i);
 		break;
 	    }
 
 	    else {
 		// evict LRU block
-	    int LRU_way=cache->LRU.back();
-		cache->LRU.pop_back();
+	    int LRU_way=cache_entry->LRU.back();
+		cache_entry->LRU.pop_back();
 
 		// and then set the tag for that way
+		set_way_tag(&(cache_entry[AddrSetIndex].ways[LRU_way]), address, num_sets);
 	    }
 
 
@@ -275,33 +322,42 @@ void CacheGet(set_associative *cache,string address,int associativity,int total_
 
 }
 
-
-
-
 // cache set for store operations
-void CacheSet(cache_entry *cache,string address,int cache_lines) {
+void CacheSet(set_associative *cache_entry,string address,int associativity,int num_sets) {
 
-
+    int way_hit;
+    int hit_flag;
+    int AddrSetIndex=Addr2CacheIndex( num_sets, address);
     num_stores=num_stores+1;
-    int cache_index=Addr2CacheIndex(cache_lines,address);
-    int hit_status=IsWayHit(cache,address,cache_lines);
 
-    if(hit_status&&cache[cache_index].dirty) {
+    // finding hit or no and which way
+    for(int i=0;i<associativity;i++) {
+
+	//we search all the ways of the set the address maps to
+	if(IsWayHit(&(cache_entry[AddrSetIndex].ways[i]),address,num_sets)){
+	    hit_flag=1;
+	    way_hit=i;
+	}
+    }
+
+    if(hit_flag) {
+	
 	num_cache_hits=num_cache_hits+1;
 	num_store_hits=num_store_hits+1;
-    }
-    else {
-	// miss meaning need to go to lower level of memory which is memory here
-	num_mem_accesses=num_mem_accesses+1;
 
-	// setting the tag for the fetched block
-	set_way_tag(cache, address, cache_lines);
+	// checking dirty bit of the way of the cache entry that hit
+	if(cache_entry[AddrSetIndex].ways[way_hit].dirty==1) {
 
-	//setting the dirty bit
-	cache[cache_index].dirty=1;
+	    // as the dirty block needs to be written to memory
+	    mem_writes=mem_writes+1;
+	}
     }
 
 }
+
+
+
+
 
 // a function that show's cache hit/miss statistics
 
@@ -318,71 +374,57 @@ void cache_result() {
 }
 
 
+void resize_cache_ways(set_associative* cache_array, int num_sets, int associativity, int cache_block_size, int set_tag_size) {
+    // Resizing the 'ways' vector according to associativity
+    for (int i = 0; i < num_sets; i++) {
+        cache_array[i].ways.resize(associativity);
+    }
+    
+    // Resizing elements of each way
+    for (int i = 0; i < num_sets; i++) {
+        for (int j = 0; j < associativity; j++) {
+            cache_array[i].ways[j].data.resize(cache_block_size * 8);
+            cache_array[i].ways[j].tag.resize(set_tag_size);
+        }
+    }
+}
+
+
 int main() {
 
 
 
-    // all direct mapping essential value finding 
-
-    //finding no of words in a block and then taking log2
-    int cache_index=log2(cache_blocks);
-
-    //finding no of words in a block and then taking log2
-    int word_offset=log2(cache_block_size/4);
-
-    // every word is 4 bytes thus 2 bits 
-    int byte_offset=2;
-    int cache_tag=(32-(cache_index+word_offset+byte_offset));
-
-
-    int associativity=3;
-
-
     // all set associative essential value finding
 
+
+    //bits to index word in a block 
+    int word_offset=log2(cache_block_size/4);
+
+    // bits to index byte in word
+    // every word is 4 bytes thus 2 bits 
+    int byte_offset=2;
+    int associativity=3;
+
+    // bits to index set in cache
     int set_index=log2(cache_blocks/associativity);
+    int num_sets=cache_blocks/associativity;
     int set_tag=(32-(set_index+word_offset+byte_offset));
 
     // creating the set associative structure
-
     struct set_associative associative_cache[set_index];
-
-    //resizing the ways according to associativity
-    for(int i=0;i<set_index;i++) {
-
-	associative_cache[i].ways.resize(associativity);
-    }
 
 
     cout << "--------------------------" << endl;
     cout << "| Number of cache blocks | " << cache_blocks << endl;
     cout << "| Cache block size       | " << cache_block_size << endl;
-    cout << "| Tag size               | " << cache_tag << endl;
-    cout << "| Index size             | " << cache_index << endl;
+    cout << "| Tag size               | " << set_tag << endl;
+    cout << "| Index size             | " << set_index << endl;
     cout << "--------------------------" << endl;
 
 
-    // creating the cache structure convert into a function later
-
-    struct cache_entry cache[cache_index];
-
-    for(int i=0;i<cache_index;i++) {
-
-	cache[i].data.resize(cache_block_size*8);
-	cache[i].tag.resize(cache_tag);
-
-    }
-
-
-    // Initialize cache with random values
-    initialize_cache(cache, cache_index, cache_tag, cache_block_size);
-
-
-    CacheSet(cache,"12341234",10);
-    CacheSet(cache,"12341234",10);
-    print_cache_contents(cache, cache_index, cache_tag, cache_block_size);
-
-
+    resize_cache_ways(associative_cache, num_sets, associativity, cache_block_size, set_tag);
+    initialize_cache(associative_cache, num_sets, associativity);
+    display_cache(associative_cache, num_sets, associativity, set_tag, cache_block_size);
 
     cache_result();
     return 0;
