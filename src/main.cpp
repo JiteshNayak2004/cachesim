@@ -43,7 +43,7 @@ int num_mem_accesses=0;
 int mem_writes=0;
 
 //initialization variables
-int cache_blocks=1024;
+int cache_blocks=128;
 // block size is in bytes
 int cache_block_size=4;
 int associativity=1;
@@ -374,17 +374,17 @@ void cache_result() {
 }
 
 
-void resize_cache_ways(set_associative* cache_array, int num_sets, int associativity, int cache_block_size, int set_tag_size) {
+void resize_cache_ways(set_associative* cache_entry, int num_sets, int associativity, int cache_block_size, int set_tag_size) {
     // Resizing the 'ways' vector according to associativity
     for (int i = 0; i < num_sets; i++) {
-        cache_array[i].ways.resize(associativity);
+        cache_entry[i].ways.resize(associativity);
     }
     
     // Resizing elements of each way
     for (int i = 0; i < num_sets; i++) {
         for (int j = 0; j < associativity; j++) {
-            cache_array[i].ways[j].data.resize(cache_block_size * 8);
-            cache_array[i].ways[j].tag.resize(set_tag_size);
+            cache_entry[i].ways[j].data.resize(cache_block_size * 8);
+            cache_entry[i].ways[j].tag.resize(set_tag_size);
         }
     }
 }
@@ -411,7 +411,7 @@ int main() {
     int set_tag=(32-(set_index+word_offset+byte_offset));
 
     // creating the set associative structure
-    struct set_associative associative_cache[set_index];
+    struct set_associative associative_cache[num_sets];
 
 
     cout << "--------------------------" << endl;
@@ -426,7 +426,6 @@ int main() {
     initialize_cache(associative_cache, num_sets, associativity);
     display_cache(associative_cache, num_sets, associativity, set_tag, cache_block_size);
 
-    cache_result();
     return 0;
 
 
