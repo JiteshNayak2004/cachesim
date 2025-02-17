@@ -11,7 +11,7 @@ thoughts:
 2.what we intend to do is say there's a miss that entry we make it such that
 we make note of misses and hits and update just the tag field data isn't 
 relevant
-
+hello
 
 tasks:
 1. convert direct map as a special case of set associative
