@@ -12,6 +12,7 @@ thoughts:
 we make note of misses and hits and update just the tag field data isn't 
 relevant
 hello
+hello
 
 tasks:
 1. convert direct map as a special case of set associative
