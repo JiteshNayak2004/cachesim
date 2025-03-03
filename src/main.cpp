@@ -122,11 +122,6 @@ void display_cache(const set_associative* cache, int num_sets, int associativity
     }
 }
 
-
-
-
-
-
 // Function to display the cache contents in a nicely formatted way
 void print_cache_contents(cache_entry *cache, int cache_index, int cache_tag, int cache_block_size) {
     cout << "Index | Valid | Dirty | Tag                             | Data\n";
