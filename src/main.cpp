@@ -9,8 +9,7 @@ thoughts:
 
 1.while modelling cache fetching from memory wagera is actually not needed
 2.what we intend to do is say there's a miss that entry we make it such that
-we make note of misses and hits and update just the tag field data isn't 
-
+we make note of misses and hits and update just the tag field data isn't
 tasks:
 1. convert direct map as a special case of set associative
 have a function to decide no of ways
