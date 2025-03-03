@@ -18,6 +18,7 @@ tasks:
 have a function to decide no of ways
 2. have a function for cache eviction
 3. make IsWayHit support associativity
+4. make support for multi-core caches
 */
 
 #include <bitset>
